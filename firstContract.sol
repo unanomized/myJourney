@@ -463,16 +463,7 @@ library Address {
     }
 }
 
-abstract contract Context {
-    function _msgSender() internal view virtual returns (address payable) {
-        return msg.sender;
-    }
 
-    function _msgData() internal view virtual returns (bytes memory) {
-        this; // silence state mutability warning without generating bytecode - see https://github.com/ethereum/solidity/issues/2691
-        return msg.data;
-    }
-}
 
 abstract contract Ownable is Context {
     address private _owner;
@@ -482,7 +473,7 @@ abstract contract Ownable is Context {
     /**
      * @dev Initializes the contract setting the deployer as the initial owner.
      */
-    constructor() {
+    constructor() public {
         _transferOwnership(_msgSender());
     }
 
@@ -534,9 +525,9 @@ abstract contract Ownable is Context {
 
 
 interface IGenesis {
-    function deposit(uint256 _pid, uint256 _amount) public;
-    function withdraw(uint256 _pid, uint256 _amount) public;
-    function emergencyWithdraw(uint256 _pid) public;
+    function deposit(uint256 _pid, uint256 _amount) external;
+    function withdraw(uint256 _pid, uint256 _amount) external;
+    function emergencyWithdraw(uint256 _pid) external;
 }
 
 interface ISpookySwapRouter {
@@ -550,49 +541,47 @@ interface ISpookySwapRouter {
 
 }
 
-interface ILiberty {
-    function balanceOf(address account) public view virtual override returns (uint256);
-    function approve(address spender, uint256 amount) public virtual override returns (bool); 
-}
 
-contract myInterface is IGenesis, Ownable, ISpookySwapRouter, ILiberty {
-    using Address for address
-    using SafeMath for uint256
+contract myInterface is Ownable {
+    using Address for address;
+    using SafeMath for uint256;
     // variables
-    IERC20 usdc public = IERC20(0x04068DA6C83AFCFA0e13ba15A6696662335D5B75);
-    IERC20 liberty public = IERC20(0x51BEA5bE08b10E89D1A76593F3627E67944Ba7eb);
-    ISpookySwapRouter router public = ISpookySwapRouter(0xF491e7B69E4244ad4002BC14e878a34207E38c29);
-    IGenesis genesis public = IGenesis(0x39f1688aae5F77b6b282601fcC6f6AC0CBb31c63);
-    ILiberty libertyContract public = ILiberty(0x51BEA5bE08b10E89D1A76593F3627E67944Ba7eb);
+    IERC20 public usdc  = IERC20(0x04068DA6C83AFCFA0e13ba15A6696662335D5B75);
+    IERC20 public liberty  = IERC20(0x51BEA5bE08b10E89D1A76593F3627E67944Ba7eb);
+    ISpookySwapRouter public router  = ISpookySwapRouter(0xF491e7B69E4244ad4002BC14e878a34207E38c29);
+    IGenesis public genesis  = IGenesis(0x39f1688aae5F77b6b282601fcC6f6AC0CBb31c63);
 
 
-    constructor() {
-        libertyContract.approve(router, uint256(max));
-        usdc.approve(genesis, uint256(max));
+    constructor() public {
+        liberty.approve(address(router), uint256(-1));
+        usdc.approve(address(genesis), uint256(-1));
     }
 
-    function deposit(uint256 _pid, uint256 _amount) onlyOwner {
-        genesis.deposit(_pid, _amount);
+    function depositToken(uint256 _pid, uint256 _amount) public onlyOwner {
+        IGenesis(genesis).deposit(_pid, _amount);
     }
 
-    function withdraw(uint256 _pid, uint256 _amount) onlyOwner{
-        genesis.withdraw(_pid, _amount);
+    function withdrawToken(uint256 _pid, uint256 _amount) public onlyOwner{
+        IGenesis(genesis).withdraw(_pid, _amount);
 
     }
     
-    function emergencyWithdraw(uint256 _pid) onlyOwner{
-        genesis.emergencyWithdraw(_pid);
+    function emergencyWithdrawToken(uint256 _pid) public onlyOwner{
+        IGenesis(genesis).emergencyWithdraw(_pid);
 
     }
 
-    function harvest(uint256 _pid) onlyOwner {
-        genesis.deposit(_pid, 0)
-        uint256 balance = libertyContract.balanceOf(address.this)
-        router.swapExactTokensForTokensSupportingFeeOnTransferTokens(balance, 0, [usdc, liberty], address.this, block.timestamp);
+    function harvest(uint256 _pid) public onlyOwner {
+        IGenesis(genesis).deposit(_pid, 0);
+        uint256 balance = liberty.balanceOf(address(this));
+        address[] memory path = new address[](2);
+        path[0] = address(liberty);
+        path[1] = address(usdc);
+        router.swapExactTokensForTokensSupportingFeeOnTransferTokens(balance, 0, path , address(this), block.timestamp);
     }
 
-    function recoverTokens(IERC20 _token, uint256 _amount) onlyOwner {
-        _token.transfer(_owner, _amount )
+    function recoverTokens(IERC20 _token, uint256 _amount) public onlyOwner {
+        _token.transfer(msg.sender, _amount );
     }
 
 
